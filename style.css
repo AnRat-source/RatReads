@@ -15,7 +15,7 @@ header {
 
 .comic-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 20px;
     padding: 20px;
 }
@@ -36,7 +36,7 @@ header {
 
 .comic-card img {
     width: 100%;
-    height: 240px;
+    height: 350px;
     object-fit: cover;
     border-radius: 8px;
     margin-bottom: 10px;
