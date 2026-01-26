@@ -154,17 +154,13 @@ pdfjsLib.getDocument(file).promise.then(async pdf => {
     totalPages = pdf.numPages;
     totalPagesSpan.textContent = totalPages;
 
-    // Load saved page
+    for (let i = 1; i <= totalPages; i++) {
+        await renderPage(i);
+    }
+
     const savedPage = parseInt(localStorage.getItem(saveKey));
     if (savedPage && savedPage > 0 && savedPage <= totalPages) {
         goToPage(savedPage - 1, false);
-    }
-
-    for (let i = 1; i <= totalPages; i++) {
-        if (savedPage && i <= savedPage + 1) {
-            goToPage(i, false);
-        }
-        await renderPage(i);
     }
 
     loadingText.style.display = "none";
