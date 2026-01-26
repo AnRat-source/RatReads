@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RatReads</title>
+
+<link rel="stylesheet" href="style.css" />
+
+<style>
+body {
+    margin: 0;
+    background: #0d0d0d;
+    color: white;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+}
+
+.topbar {
+    height: 50px;
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid #222;
+    position: fixed;
+    width: 100%;
+    z-index: 10;
+}
+
+#title {
+    flex: 1;
+    text-align: center;
+}
+
+#pageControl {
+    position: absolute;
+    right: 15px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+#pageInput {
+    width: 50px;
+    background: #222;
+    border: 1px solid #333;
+    color: white;
+    text-align: center;
+    border-radius: 4px;
+    padding: 3px;
+}
+
+#viewer {
+    position: absolute;
+    top: 50px;
+    bottom: 0;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+}
+
+.page {
+    flex: 0 0 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    scroll-snap-align: center;
+}
+
+canvas {
+    max-width: 100%;
+    max-height: 100%;
+    box-shadow: 0 0 15px rgba(0,0,0,0.8);
+    border-radius: 6px;
+}
+
+.loading {
+    position: absolute;
+    top: 50%;
+    width: 100%;
+    text-align: center;
+    font-size: 10vh;
+    opacity: 0.6;
+}
+
+.click-zone {
+    position: fixed;
+    top: 50px;
+    bottom: 0;
+    width: 50%;
+    z-index: 20;
+}
+
+button {
+            background: #222;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            margin: 5px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+#leftZone { left: 0; }
+#rightZone { right: 0; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <button onclick="window.location.href='./index.html'">⬅ Back</button>
+
+    <div id="title">Loading...</div>
+    <div id="pageControl">
+        Page <input type="number" id="pageInput" min="1" value="1"> / <span id="totalPages">?</span>
+    </div>
+</div>
+
+<div id="viewer"></div>
+<div class="loading" id="loadingText">Loading comic pages…</div>
+
+<div id="leftZone" class="click-zone"></div>
+<div id="rightZone" class="click-zone"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const file = params.get("file");
+const title = params.get("title");
+document.getElementById("title").textContent = title;
+document.title = title;
+
+const viewer = document.getElementById("viewer");
+const loadingText = document.getElementById("loadingText");
+const pageInput = document.getElementById("pageInput");
+const totalPagesSpan = document.getElementById("totalPages");
+
+let pdfDoc = null;
+let currentPage = 0;
+let totalPages = 0;
+
+const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+const saveKey = "comic-progress-" + file;
+
+/* ---------- LOAD PDF ---------- */
+pdfjsLib.getDocument(file).promise.then(async pdf => {
+    pdfDoc = pdf;
+    totalPages = pdf.numPages;
+    totalPagesSpan.textContent = totalPages;
+
+    // Load saved page
+    const savedPage = parseInt(localStorage.getItem(saveKey));
+    if (savedPage && savedPage > 0 && savedPage <= totalPages) {
+        goToPage(savedPage - 1, false);
+    }
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (savedPage && i <= savedPage + 1) {
+            goToPage(i, false);
+        }
+        await renderPage(i);
+    }
+
+    loadingText.style.display = "none";
+});
+
+/* ---------- RENDER PAGE ---------- */
+async function renderPage(num) {
+    const page = await pdfDoc.getPage(num);
+
+    const viewport = page.getViewport({ scale: 1 });
+    const availableWidth = window.innerWidth;
+    const availableHeight = window.innerHeight - 50;
+
+    const scale = Math.min(
+        availableWidth / viewport.width,
+        availableHeight / viewport.height
+    );
+
+    const scaledViewport = page.getViewport({ scale });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = scaledViewport.width;
+    canvas.height = scaledViewport.height;
+
+    const pageDiv = document.createElement("div");
+    pageDiv.className = "page";
+    pageDiv.appendChild(canvas);
+    viewer.appendChild(pageDiv);
+
+    await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+}
+
+/* ---------- PAGE NAV ---------- */
+function goToPage(index, save = true) {
+    const width = viewer.clientWidth;
+    viewer.scrollTo({ left: width * index, behavior: 'smooth' });
+    currentPage = index;
+    pageInput.value = index + 1;
+
+    if (save) {
+        localStorage.setItem(saveKey, index + 1);
+    }
+}
+
+/* Input jump */
+pageInput.addEventListener("change", () => {
+    let val = parseInt(pageInput.value);
+    if (val >= 1 && val <= totalPages) {
+        goToPage(val - 1);
+    }
+});
+
+/* Track scroll position */
+viewer.addEventListener("scroll", () => {
+    const pageWidth = viewer.clientWidth;
+    const index = Math.round(viewer.scrollLeft / pageWidth);
+    if (index !== currentPage) {
+        currentPage = index;
+        pageInput.value = index + 1;
+        localStorage.setItem(saveKey, index + 1);
+    }
+});
+
+/* ---------- MOBILE SWIPE ---------- */
+if (isMobile) {
+    let startX, scrollStart;
+
+    viewer.addEventListener('touchstart', e => {
+        startX = e.touches[0].pageX;
+        scrollStart = viewer.scrollLeft;
+    });
+
+    viewer.addEventListener('touchmove', e => {
+        const x = e.touches[0].pageX;
+        viewer.scrollLeft = scrollStart - (x - startX);
+    });
+
+    leftZone.style.display = "none";
+    rightZone.style.display = "none";
+}
+
+/* ---------- DESKTOP CLICK ---------- */
+if (!isMobile) {
+    leftZone.onclick = () => currentPage > 0 && goToPage(currentPage - 1);
+    rightZone.onclick = () => currentPage < totalPages - 1 && goToPage(currentPage + 1);
+}
+
+</script>
+</body>
+</html>
