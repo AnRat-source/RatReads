@@ -2,7 +2,7 @@ const comics = [
     {
         title: "Combat Company: Operator Orange Vol 1",
         file: "comics/Combat Company; Operator Orange Vol 1.pdf",
-        cover: "covers/CC Operator Orange Vol 1.png"
+        cover: "Covers/CC Operator Orange Vol 1.png"
     },
 ];
 
