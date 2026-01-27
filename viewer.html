@@ -16,6 +16,18 @@ body {
     font-family: Arial, sans-serif;
 }
 
+body.fullscreen .topbar {
+    display: none;
+}
+
+body.fullscreen #viewer {
+    top: 0;
+}
+
+body.fullscreen .click-zone {
+    top: 0;
+}
+
 .topbar {
     height: 50px;
     background: #111;
@@ -122,6 +134,7 @@ button {
     <div id="title">Loading...</div>
     <div id="pageControl">
         Page <input type="number" id="pageInput" min="1" value="1"> / <span id="totalPages">?</span>
+        <button id="fullscreenBtn" title="Fullscreen">⛶</button>
     </div>
 </div>
 
@@ -151,6 +164,22 @@ let totalPages = 0;
 const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
 const saveKey = "comic-progress-" + file;
 const scaleMultiplier = isMobile ? 0.9 : 1.2;
+
+const fullscreenBtn = document.getElementById("fullscreenBtn");
+/* ---------- FULLSCREEN TOGGLE ---------- */
+fullscreenBtn.addEventListener("click", () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+});
+
+/* When fullscreen changes */
+document.addEventListener("fullscreenchange", () => {
+    const isFs = !!document.fullscreenElement;
+    document.body.classList.toggle("fullscreen", isFs);
+});
 
 /* ---------- LOAD PDF ---------- */
 pdfjsLib.getDocument(file).promise.then(async pdf => {
@@ -200,8 +229,8 @@ async function renderPage(num) {
     await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
 }
 
-function renderVisiblePages(index) {
-    renderPage(index + 1); // current
+async function renderVisiblePages(index) {
+    await renderPage(index + 1); // current
     renderPage(index);     // previous
     renderPage(index + 2); // next
     renderPage(index + 3); // next
