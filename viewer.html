@@ -59,8 +59,10 @@ body {
     width: 100%;
     display: flex;
     scroll-snap-type: x mandatory;
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
+    overscroll-behavior: contain;
     overflow: hidden;
+    -webkit-overflow-scrolling: auto;
 }
 
 .page {
@@ -70,6 +72,8 @@ body {
     justify-content: center;
     align-items: center;
     scroll-snap-align: center;
+    background-color: #000000;
+    color: #000000;
 }
 
 canvas {
@@ -85,7 +89,7 @@ canvas {
     width: 100%;
     text-align: center;
     font-size: 10vh;
-    opacity: 0.6;
+    opacity: 0;
 }
 
 .click-zone {
@@ -146,6 +150,7 @@ let totalPages = 0;
 
 const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
 const saveKey = "comic-progress-" + file;
+const scaleMultiplier = isMobile ? 0.9 : 1.2;
 
 /* ---------- LOAD PDF ---------- */
 pdfjsLib.getDocument(file).promise.then(async pdf => {
@@ -154,19 +159,23 @@ pdfjsLib.getDocument(file).promise.then(async pdf => {
     totalPagesSpan.textContent = totalPages;
 
     for (let i = 1; i <= totalPages; i++) {
-        await renderPage(i);
+        const pageDiv = document.createElement("div");
+        pageDiv.className = "page";
+        pageDiv.dataset.page = i;
+        viewer.appendChild(pageDiv);
     }
 
-    const savedPage = parseInt(localStorage.getItem(saveKey));
-    if (savedPage && savedPage > 0 && savedPage <= totalPages) {
-        goToPage(savedPage - 1, false);
-    }
-
+    renderVisiblePages(1);
     loadingText.style.display = "none";
 });
 
 /* ---------- RENDER PAGE ---------- */
+const renderedPages = new Set();
+
 async function renderPage(num) {
+    if (renderedPages.has(num)) return;
+    renderedPages.add(num);
+
     const page = await pdfDoc.getPage(num);
 
     const viewport = page.getViewport({ scale: 1 });
@@ -178,19 +187,24 @@ async function renderPage(num) {
         availableHeight / viewport.height
     );
 
-    const scaledViewport = page.getViewport({ scale });
+    const scaledViewport = page.getViewport({ scale:(scale*scaleMultiplier) });
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     canvas.width = scaledViewport.width;
     canvas.height = scaledViewport.height;
 
-    const pageDiv = document.createElement("div");
-    pageDiv.className = "page";
+    const pageDiv = viewer.querySelector(`.page[data-page="${num}"]`);
     pageDiv.appendChild(canvas);
-    viewer.appendChild(pageDiv);
 
     await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+}
+
+function renderVisiblePages(index) {
+    renderPage(index + 1); // current
+    renderPage(index);     // previous
+    renderPage(index + 2); // next
+    renderPage(index + 3); // next
 }
 
 /* ---------- PAGE NAV ---------- */
@@ -199,10 +213,6 @@ function goToPage(index, save = true) {
     viewer.scrollTo({ left: width * index, behavior: 'smooth' });
     currentPage = index;
     pageInput.value = index + 1;
-
-    if (save) {
-        localStorage.setItem(saveKey, index + 1);
-    }
 }
 
 /* Input jump */
@@ -220,7 +230,7 @@ viewer.addEventListener("scroll", () => {
     if (index !== currentPage) {
         currentPage = index;
         pageInput.value = index + 1;
-        localStorage.setItem(saveKey, index + 1);
+        renderVisiblePages(index);
     }
 });
 
@@ -235,7 +245,7 @@ if (isMobile) {
 
     viewer.addEventListener('touchmove', e => {
         const x = e.touches[0].pageX;
-        viewer.scrollLeft = scrollStart - (x - startX);
+        viewer.scrollLeft = scrollStart - ((x - startX)*4);
     });
 
     leftZone.style.display = "none";
